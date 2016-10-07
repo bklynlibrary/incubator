@@ -1,0 +1,253 @@
+<?php
+/**
+ * @file
+ * Code for the incubator feature.
+ */
+
+include_once 'incubator.features.inc';
+
+function incubator_menu() {
+  $items = array();
+  $items['admin/config/incubator'] = array(
+    'title' => 'Incubator Settings',
+    'description' => t('settings'),
+    'position' => 'left',
+    'weight' => '-100',
+    'page callback' => 'system_admin_menu_block_page',
+    'access arguments' => array('access administration pages'),
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+  );
+  $items['admin/config/incubator/rebuild'] = array(
+    'title' => 'Rebuild Workflow',
+    'description' => t('Rebulds the incubator submission workflow'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('incubator_rebuild_workflow_form'),
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['admin/config/incubator/nodes'] = array(
+    'title' => 'Incubator Submissions (admin)',
+    'description' => t(''),
+    'page callback' => 'drupal_goto',
+    'page arguments' => array('incubator-submissions/admin'),
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['admin/config/incubator/user'] = array(
+    'title' => 'Incubator Submissions (current user)',
+    'description' => t(''),
+    'page callback' => 'drupal_goto',
+    'page arguments' => array('incubator-submissions/user'),
+    'access arguments' => array('access content'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+function incubator_rebuild_workflow_form() {
+
+  $form = array();
+
+  $form['rebuild_workflow'] = array(
+    '#type' => 'submit',
+    '#value' => t('Rebuild incubator workflow'),
+    '#prefix' => '<p>This will revert the incubator workflow to it\'s default settings, and is used to ensure proper transition permissions. This should only be used before incubator content is created.</p><p>WARNING: do not use if there is already content associated with the workflow!</p>'
+  );
+  return $form;
+}
+
+function incubator_rebuild_workflow_form_submit($form, $form_state) {
+  incubator_rebuild_workflow();
+  drupal_set_message(t('Incubator submission workflow rebuilt'));
+}
+
+
+
+function incubator_get_roles($create_if_absent= true) {
+  $roles = array(
+    'incubator moderator',
+    'incubator patron',
+    'incubator participant'
+  );
+  $current_roles = user_roles();
+  $incubator_roles = array();
+  foreach ($roles as $i => $role) {
+    if (in_array($role, $current_roles)) {
+      $loaded_role = user_role_load_by_name($role);
+      $incubator_roles[$role] = $loaded_role;
+    }
+    else {
+      $created_role = new stdClass();
+      $created_role->name = $role;
+      user_role_save($created_role);
+      $incubator_roles[$role] = $created_role;
+    }
+  }
+  return $incubator_roles;
+}
+
+function incubator_rebuild_workflow() {
+
+  $workflow_name = 'incubator_submission_workflow';
+  $states = array(
+    'submitted',
+    'revisions needed',
+    'public',
+    'closed',
+    'staff review',
+    'idea bank',
+    'winner'
+  );
+  $transitions = array(
+    ['created', 'submitted', ['author', 'incubator moderator']],
+    ['submitted', 'revisions needed', ['author', 'incubator moderator']],
+    ['submitted', 'public', ['incubator moderator']],
+    ['submitted', 'closed', ['incubator moderator']],
+    ['submitted', 'staff review', ['incubator moderator']],
+    ['submitted', 'idea bank', ['incubator moderator']],
+    ['submitted', 'winner', ['incubator moderator']],
+    ['revisions needed', 'submitted', ['incubator moderator']],
+    ['revisions needed', 'public', ['incubator moderator']],
+    ['revisions needed', 'closed', ['incubator moderator']],
+    ['revisions needed', 'staff review', ['incubator moderator']],
+    ['revisions needed', 'idea bank', ['incubator moderator']],
+    ['revisions needed', 'winner', ['incubator moderator']],
+    ['public', 'submitted', ['incubator moderator']],
+    ['public', 'revisions needed', ['incubator moderator']],
+    ['public', 'closed', ['incubator moderator']],
+    ['public', 'staff review', ['incubator moderator']],
+    ['public', 'idea bank', ['incubator moderator']],
+    ['public', 'winner', ['incubator moderator']],
+    ['closed', 'submitted', ['incubator moderator']],
+    ['closed', 'revisions needed', ['incubator moderator']],
+    ['closed', 'public', ['incubator moderator']],
+    ['closed', 'staff review', ['incubator moderator']],
+    ['closed', 'idea bank', ['incubator moderator']],
+    ['closed', 'winner', ['incubator moderator']],
+    ['staff review', 'submitted', ['incubator moderator']],
+    ['staff review', 'revisions needed', ['incubator moderator']],
+    ['staff review', 'public', ['incubator moderator']],
+    ['staff review', 'closed', ['incubator moderator']],
+    ['staff review', 'idea bank', ['incubator moderator']],
+    ['staff review', 'winner', ['incubator moderator']],
+    ['idea bank', 'submitted', ['incubator moderator']],
+    ['idea bank', 'revisions needed', ['incubator moderator']],
+    ['idea bank', 'public', ['incubator moderator']],
+    ['idea bank', 'closed', ['incubator moderator']],
+    ['idea bank', 'staff review', ['incubator moderator']],
+    ['idea bank', 'winner', ['incubator moderator']],
+    ['winner', 'submitted', ['incubator moderator']],
+    ['winner', 'revisions needed', ['incubator moderator']],
+    ['winner', 'public', ['incubator moderator']],
+    ['winner', 'closed', ['incubator moderator']],
+    ['winner', 'staff review', ['incubator moderator']],
+    ['winner', 'idea bank', ['incubator moderator']],
+  );
+
+  $old_wid = variable_get('incubator_wid', -1);
+  if ($old_wid > -1) {
+    $old_workflow = workflow_load_single($old_wid);
+    $old_workflow->delete();
+  }
+
+  $incubator_roles = incubator_get_roles();
+
+  user_role_revoke_permissions(DRUPAL_ANONYMOUS_RID, array('participate in workflow'));
+  user_role_revoke_permissions(DRUPAL_AUTHENTICATED_RID, array('participate in workflow'));
+  user_role_grant_permissions($incubator_roles['incubator moderator']->rid, array('participate in workflow'));
+  user_role_grant_permissions($incubator_roles['incubator moderator']->rid, array('administer workflow'));
+  user_role_grant_permissions($incubator_roles['incubator participant']->rid, array('participate in workflow'));
+
+
+  $workflow = workflow_create($workflow_name);
+  $workflow->save();
+  variable_set('incubator_wid', $workflow->wid);
+
+  $created_states = array();
+  foreach ($states as $i => $state) {
+    $created_state = $workflow->createState($state);
+    $created_state->save();
+    $created_states[$state] = $created_state;
+  }
+  $created_transitions = array();
+  foreach ($transitions as $i => $transition) {
+    $from = ($transition[0] == 'created') ? $workflow->getCreationSid() : $created_states[$transition[0]]->sid;
+    $to = ($transition[1] == 'created') ? $workflow->getCreationSid() : $created_states[$transition[1]]->sid;
+    $created_transition = $workflow->createTransition($from, $to);
+    $transition_roles = array();
+    foreach ($transition[2] as $j => $role) {
+      if ($role !== 'author') {
+        $transition_roles[] = $incubator_roles[$role]->rid;
+      }
+      else {
+        $transition_roles[] = -1;
+      }
+    }
+    $created_transition->roles = $transition_roles;
+    $created_transition->save();
+  }
+  $workflow->save();
+}
+
+
+function incubator_node_view($node, $view_mode, $lang) {
+  if ($node->type == 'incubator_submission') {
+
+    //If public hide rating widget
+    $sid = workflow_node_current_state($node);
+    $wid = variable_get('incubator_wid', -1);
+    if ($wid > -1) {
+      $workflow = workflow_load_single($wid);
+      $state = $workflow->states[$sid];
+      if ($state->state == 'public') {
+        unset($node->content['field_is_rating']);
+        unset($node->content['comments']);
+      }
+    }
+  }
+  return $node;
+}
+
+function incubator_node_presave($node) {
+  if ($node->type == 'incubator_submission') {
+
+    //If public hide rating widget
+    $sid = workflow_node_current_state($node);
+    $wid = variable_get('incubator_wid', -1);
+    if ($wid > -1) {
+      $workflow = workflow_load_single($wid);
+      $state = $workflow->states[$sid];
+      if ($state->state == 'public') {
+        $node->status = 1;
+      }
+    }
+  }
+  return $node;
+}
+
+function _incubator_create_vocabulary($label, $machine_name, $description = '') {
+  module_load_include('module', 'taxonomy', 'taxonomy');
+
+  $vocab = new stdClass();
+  $vocab->name = t($label);
+  $vocab->machine_name = $machine_name;
+  $vocab->description = t($description);
+  $vocab->hierarchy = 0;
+  $vocab->module = 'incubator';
+  $vocab->weight = 0;
+  taxonomy_vocabulary_save($vocab);
+  $vocab = taxonomy_vocabulary_machine_name_load($machine_name);
+  return $vocab;
+}
+
+function _incubator_add_terms($vocab, $terms) {
+  foreach ($terms as $weight => $term_name) {
+    $term = new stdClass();
+    $term->name = $term_name;
+    $term->vid = $vocab->vid;
+    $term->weight = $weight;
+    $term->vocabulary_machine_name = $vocab->machine_name;
+    taxonomy_term_save($term);
+  }
+}

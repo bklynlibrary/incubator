@@ -1,0 +1,101 @@
+<?php
+
+function incubator_install() {
+
+  $roles = array(
+    'incubator moderator',
+    'incubator patron',
+    'incubator participant'
+  );
+
+  $vocabs = array(
+    array(
+      'label' => 'Incubator Strategic Plan',
+      'machine_name' => 'incubator_strategic_plan',
+      'terms' => array(
+        'Access',
+        'Culture',
+        'Education',
+        'Inclusion',
+        'Space',
+        'Stewardship'
+      )
+    ),
+    array(
+      'label' => 'Incubator Target Audience',
+      'machine_name' => 'incubator_target_audience',
+      'terms' => array(
+        'Birth to five years',
+        'Kids',
+        'Teens',
+        'Adults',
+        'Older adults'
+      )
+    ),
+    array(
+      'label' => 'Incubator Locations',
+      'machine_name' => 'incubator_locations',
+      'terms' => array(),
+    )
+  );
+
+
+
+  //Roles
+  $created_roles = array();
+  foreach ($roles as $i => $role) {
+    $created_role = new stdClass();
+    $created_role->name = $role;
+    user_role_save($created_role);
+    $created_roles[$role] = $created_role;
+  }
+
+  //Vocabularies
+  foreach ($vocabs as $i => $vocab) {
+    $created_vocab = _incubator_create_vocabulary($vocab['label'], $vocab['machine_name']);
+    variable_set('incubator_vocab_' . $vocab['machine_name'], $created_vocab->vid);
+    if (count($vocab['terms']) > 0) {
+      _incubator_add_terms($created_vocab, $vocab['terms']);
+    }
+  }
+
+  module_enable(array('workflow', 'workflow_admin_ui', 'workflowfield'));
+
+  incubator_rebuild_workflow();
+}
+
+function incubator_uninstall() {
+
+  //Roles
+  $roles = array(
+    'incubator moderator',
+    'incubator patron',
+    'incubator participant'
+  );
+  foreach ($roles as $i => $role) {
+    user_role_delete($role);
+  }
+
+  //Vocabularies
+  $vocabs = array(
+    'incubator_strategic_plan',
+    'incubator_target_audience',
+    'incubator_locations'
+  );
+  foreach($vocabs as $i => $machine_name) {
+    $vid = variable_get('incubator_vocab_' . $machine_name, -1);
+    variable_del('incubator_vocab_' . $machine_name, -1);
+    if ($vid > -1) {
+      taxonomy_vocabulary_delete($vid);
+    }
+  }
+
+  //Workflow
+de_types_rebuild();
+  $wid = variable_get('incubator_submission_workflow', -1);
+  variable_del('incubator_submission_workflow', -1);
+  if ($wid > -1) {
+    $workflow = workflow_load($wid);
+    $workflow->delete();
+  }
+}
