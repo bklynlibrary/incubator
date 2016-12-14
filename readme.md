@@ -23,3 +23,6 @@ incubator-submissions - incubator submission listing
 incubator-submissions/winners - incubator submission winners  
 incubator-submissions/idea-bank - incubator submissions in the idea bank  
 
+# Notes
+
+After installing, be sure to verify that the various views filter on the correct workflow states. Also verify workflow state permissions.
