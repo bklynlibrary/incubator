@@ -21,7 +21,8 @@ function incubator_strongarm() {
   $strongarm->disabled = FALSE; /* Edit this to true to make a default strongarm disabled initially */
   $strongarm->api_version = 1;
   $strongarm->name = 'ant_pattern_incubator_submission';
-  $strongarm->value = '[node:field_is_program_name]-[node:created]';
+  //$strongarm->value = '[node:field_is_program_name]-[node:created]';
+  $strongarm->value = '[node:field-is-program-name]-[node:created]';
   $export['ant_pattern_incubator_submission'] = $strongarm;
 
   $strongarm = new stdClass();
