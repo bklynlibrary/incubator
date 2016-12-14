@@ -6,6 +6,9 @@ BKLYN Incubator is a program developed by [Brooklyn Public Library](http://www.b
 
 Brooklyn Public Library partnered with [Bureau Blank](http://bureaublank.com/), a NYC-based technology and digital design organization, to create an open source web-based Drupal application called the Incubator Web Tool. This tool allows staff to submit ideas for projects, allows for public comment, and houses all of the final evaluations from Incubator applicants in an idea bank.  The submission form requests basic information about the team, program, budget, and audience but also requires applicants to identify the community need that their proposed program would help address, how their idea aligned with the Library’s strategic priorities, any potential solutions for anticipated challenges, and the metrics for success.  Applicants also have the opportunity to submit any work they have done to develop their idea including research, planning documents, and timelines that might indicate their aptitude and potential to succeed.
 
+# System Requirements
+
+Drupal 7
 
 # Installation
 
